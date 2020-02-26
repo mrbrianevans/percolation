@@ -78,7 +78,6 @@ def percolate(matrix: np.ndarray):
                     blank[i, j + 1] = 1
                 else:
                     blank[i, j + 1] = 2
-    print(blank)
     return blank
     # This checks if the water reached the bottom or not
     for j in range(N + 2):
@@ -97,17 +96,37 @@ def percolate_onedrop(matrix: np.ndarray):
 
     """
     N = matrix.shape[0]
-    waterdrop_location = (0, int(N / 2))
-    blank = np.zeros(matrix.shape, dtype=int)
-    blank[waterdrop_location] = 1
-    print(blank)
+    waterdrop_h = int(N / 2)
+    waterdrop_v = 0
+    matrix[waterdrop_v, waterdrop_h] = 1
+    possible_to_flow = True
+    while (possible_to_flow):
+        if N == waterdrop_v+2:  # checks if the water has reached the bottom
+            possible_to_flow = False
+        if matrix[waterdrop_v + 1, waterdrop_h] == 2:  # checks the position directly below the drop
+            print("First", waterdrop_v + 1, waterdrop_h)
+            waterdrop_v += 1
+            print("After adulteration", waterdrop_v, waterdrop_h)
+            matrix[waterdrop_v, waterdrop_h] = 1
+        elif matrix[waterdrop_v + 1, waterdrop_h - 1] == 2:  # checks the position down-left of drop
+            waterdrop_v += 1
+            waterdrop_h -= 1
+            matrix[waterdrop_v, waterdrop_h] = 1
+        elif matrix[waterdrop_v + 1, waterdrop_h + 1] == 2:  # checks the down-right position
+            waterdrop_v += 1
+            waterdrop_h += 1
+            matrix[waterdrop_v, waterdrop_h] = 1
+        elif matrix[waterdrop_v, waterdrop_h + 1] == 2:  # checks the position directly right
+            waterdrop_h += 1
+            matrix[waterdrop_v, waterdrop_h] = 1
+        else:
+            possible_to_flow = False  # if none of the options are sand, then end the loop
+    return matrix
 
 
 # NEXT STEP: animate it in Tkinter, write simulation tests for a thousand cases
 
 if __name__ == "__main__":
-    matrix1 = generate_matrix(100, 0.55)
+    matrix1 = generate_matrix(100, 0.25)
     print(matrix1)
-    # animate_matrix(matrix1, 400)
-    percolate_onedrop(matrix1)
-    animate_matrix(percolate(matrix1), 800)
+    animate_matrix(percolate_onedrop(matrix1), 800)
