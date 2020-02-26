@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from tkinter import Tk, Canvas
 
 tk = Tk()
@@ -79,11 +80,6 @@ def percolate(matrix: np.ndarray):
                 else:
                     blank[i, j + 1] = 2
     return blank
-    # This checks if the water reached the bottom or not
-    for j in range(N + 2):
-        if blank[N - 1, j] == 1:
-            return True
-    return False
 
 
 def percolate_onedrop(matrix: np.ndarray):
@@ -101,12 +97,10 @@ def percolate_onedrop(matrix: np.ndarray):
     matrix[waterdrop_v, waterdrop_h] = 1
     possible_to_flow = True
     while (possible_to_flow):
-        if N == waterdrop_v+2:  # checks if the water has reached the bottom
+        if N == waterdrop_v + 2:  # checks if the water has reached the bottom
             possible_to_flow = False
         if matrix[waterdrop_v + 1, waterdrop_h] == 2:  # checks the position directly below the drop
-            print("First", waterdrop_v + 1, waterdrop_h)
             waterdrop_v += 1
-            print("After adulteration", waterdrop_v, waterdrop_h)
             matrix[waterdrop_v, waterdrop_h] = 1
         elif matrix[waterdrop_v + 1, waterdrop_h - 1] == 2:  # checks the position down-left of drop
             waterdrop_v += 1
@@ -124,9 +118,55 @@ def percolate_onedrop(matrix: np.ndarray):
     return matrix
 
 
-# NEXT STEP: animate it in Tkinter, write simulation tests for a thousand cases
+def test_percolation(matrix: np.ndarray):
+    N = matrix.shape[0]
+    for j in range(N):
+        if matrix[N - 1, j] == 1:
+            return True
+    return False
+
+
+# NEXT STEP: write simulation tests for a thousand cases
+
+
+def run_sim(size, p, iterations):
+    print("Simulation started")
+    number_of_times_bottom_reached = 0
+    for i in range(iterations):
+        matrix = generate_matrix(size, p)
+        percolation = percolate_onedrop(matrix)
+        if test_percolation(percolation):
+            number_of_times_bottom_reached += 1
+    print("\n\nMatrix size:", size, "x", size, "with p =", p)
+    print("In", iterations, "iterations, there were ", number_of_times_bottom_reached, "successes")
+    print("This is an average rate of", number_of_times_bottom_reached / iterations)
+    return number_of_times_bottom_reached / iterations
+
+
+def sim_vary_p(size: int, iterations: int, steps: float) -> None:
+    print("Simulation started")
+    x_values = np.arange(0, 1, steps)
+    y_values = []
+    hit_zero = False
+    for p in x_values:
+        if not hit_zero:
+            y_values.append(run_sim(size, p, iterations))
+        else:
+            y_values.append(0)
+        if y_values[-1] == 0:  # once zero is reached, it will stop simulating and only append zeros
+            hit_zero = True  # this will save useless computation
+    print("Simulation finished: Here are the results")
+    print(x_values)
+    print(y_values)
+    plt.plot(x_values, y_values)
+    plt.show()
+
 
 if __name__ == "__main__":
-    matrix1 = generate_matrix(100, 0.25)
-    print(matrix1)
-    animate_matrix(percolate_onedrop(matrix1), 800)
+    # To run many simulations and graph the results, use this function:
+    sim_vary_p(size=100, iterations=10000, steps=0.005)
+
+    # To simulate just one percolation and animate it with graphics, use this syntax
+    matrix1 = generate_matrix(N=100, p=0.4)  # N - size of matrix, p - proportion of rock
+    perc = percolate_onedrop(matrix=matrix1)
+    animate_matrix(matrix=perc, size=800)  # size is number of pixels to draw the grid
