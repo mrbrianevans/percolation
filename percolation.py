@@ -1,3 +1,6 @@
+import datetime
+import time
+
 import numpy as np
 import matplotlib.pyplot as plt
 from tkinter import Tk, Canvas
@@ -118,7 +121,8 @@ def percolate_onedrop(matrix: np.ndarray):
     return matrix
 
 
-def test_percolation(matrix: np.ndarray):
+def test_percolation(matrix: np.ndarray) -> bool:
+    """Checks if water reached the bottom"""
     N = matrix.shape[0]
     for j in range(N):
         if matrix[N - 1, j] == 1:
@@ -129,14 +133,25 @@ def test_percolation(matrix: np.ndarray):
 # NEXT STEP: write simulation tests for a thousand cases
 
 
-def run_sim(size, p, iterations):
-    print("Simulation started")
+def run_sim(size: int, p: float, iterations: int):
+    """
+    Simulates the percolation algorithm on randomly generated matrices and returns average successes
+    Args:
+        size: size of the square matrix (N in NxN)
+        p: probability of rocks being generated for each cell of the matrix
+        iterations: number of realisations
+
+    Returns: The number of times water reached the bottom as a percentage of total realisations
+
+    """
     number_of_times_bottom_reached = 0
     for i in range(iterations):
         matrix = generate_matrix(size, p)
         percolation = percolate_onedrop(matrix)
         if test_percolation(percolation):
             number_of_times_bottom_reached += 1
+
+    # This prints for each value of p if you run sim_vary_p. Comment out to avoid if necessary
     print("\n\nMatrix size:", size, "x", size, "with p =", p)
     print("In", iterations, "iterations, there were ", number_of_times_bottom_reached, "successes")
     print("This is an average rate of", number_of_times_bottom_reached / iterations)
@@ -144,7 +159,17 @@ def run_sim(size, p, iterations):
 
 
 def sim_vary_p(size: int, iterations: int, steps: float) -> None:
-    print("Simulation started")
+    """
+    Run a simulation across different values of P, and graph the results with matplotlib
+    Args:
+        size: size of the square matrix (N in NxN)
+        iterations: number of realisations for each value of p
+        steps: the increase of p after each sim. (smaller values give more accurate graph results)
+
+    Returns: nothing. just outputs a graph with matplotlib
+
+    """
+    print("Simulation started at", datetime.datetime.now())
     x_values = np.arange(0, 1, steps)
     y_values = []
     hit_zero = False
@@ -155,16 +180,41 @@ def sim_vary_p(size: int, iterations: int, steps: float) -> None:
             y_values.append(0)
         if y_values[-1] == 0:  # once zero is reached, it will stop simulating and only append zeros
             hit_zero = True  # this will save useless computation
-    print("Simulation finished: Here are the results")
+    print("Simulation finished at", datetime.datetime.now())
     print(x_values)
     print(y_values)
-    plt.plot(x_values, y_values)
+    plt.plot(x_values, y_values, color="k")
+
+    # This finds the critical value of P. It could be improved by interpolating the data
+    closest = 1
+    Pc, Py = 0, 0
+    for y in range(len(y_values)):
+        if abs(0.5-y_values[y]) < closest:
+            closest = abs(0.5-y_values[y])
+            Pc = x_values[y]
+            Py = y_values[y]
+    plt.plot([Pc, Pc], [1, 0], label="Critical value of P", color="r")
+    plt.plot([0, 1], [Py, Py], color="r")
+    plt.plot([Pc], [Py], "o", color="orange")
+    plt.text(Pc-0.1, 1, "Critical value of P="+str(Pc))
+    plt.text(0.75, Py+0.005, "" + str(round(Py*100)) + "% success rate")
+    plt.ylabel("Average probability of water reaching the bottom")
+    plt.xlabel("p")
+    plt.title("Percolation simulation: N=" + str(size) + ", nrep=" + str(iterations) + ", P steps=" + str(steps))
+
     plt.show()
 
 
 if __name__ == "__main__":
+
+    start_time = time.perf_counter()
     # To run many simulations and graph the results, use this function:
-    sim_vary_p(size=100, iterations=10000, steps=0.005)
+    sim_vary_p(size=40, iterations=1000, steps=0.01)
+
+    # This just times how long the simulation took (can easily be north of 1 hour)
+    finish_time = time.perf_counter()
+    time_taken = finish_time - start_time
+    print("Time taken:", time_taken, "seconds")
 
     # To simulate just one percolation and animate it with graphics, use this syntax
     matrix1 = generate_matrix(N=100, p=0.4)  # N - size of matrix, p - proportion of rock
