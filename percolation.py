@@ -95,6 +95,14 @@ def percolate_onedrop(matrix: np.ndarray):
 
     """
     N = matrix.shape[0]
+
+    # This adds in walls of rock on either side, to stop the drop of water flowing out of the grid
+    walled_matrix = np.zeros(shape=(N, N+2), dtype=int)
+    for i in range(N):
+        for j in range(N):
+            walled_matrix[i, j+1] = matrix[i, j]
+    matrix = walled_matrix
+
     waterdrop_h = int(N / 2)
     waterdrop_v = 0
     matrix[waterdrop_v, waterdrop_h] = 1
@@ -118,6 +126,14 @@ def percolate_onedrop(matrix: np.ndarray):
             matrix[waterdrop_v, waterdrop_h] = 1
         else:
             possible_to_flow = False  # if none of the options are sand, then end the loop
+
+    # This removes the walls on either side
+    walled_matrix = np.zeros(shape=(N, N), dtype=int)
+    for i in range(N):
+        for j in range(N):
+            walled_matrix[i, j] = matrix[i, j+1]
+    matrix=walled_matrix
+
     return matrix
 
 
@@ -209,7 +225,11 @@ if __name__ == "__main__":
 
     start_time = time.perf_counter()
     # To run many simulations and graph the results, use this function:
-    sim_vary_p(size=40, iterations=1000, steps=0.01)
+    sim_vary_p(size=10, iterations=4000, steps=0.005)
+    sim_vary_p(size=50, iterations=4000, steps=0.005)
+    sim_vary_p(size=100, iterations=4000, steps=0.005)
+    sim_vary_p(size=200, iterations=4000, steps=0.005)
+    sim_vary_p(size=400, iterations=4000, steps=0.005)
 
     # This just times how long the simulation took (can easily be north of 1 hour)
     finish_time = time.perf_counter()
@@ -217,6 +237,6 @@ if __name__ == "__main__":
     print("Time taken:", time_taken, "seconds")
 
     # To simulate just one percolation and animate it with graphics, use this syntax
-    matrix1 = generate_matrix(N=100, p=0.4)  # N - size of matrix, p - proportion of rock
+    matrix1 = generate_matrix(N=10, p=0.25)  # N - size of matrix, p - proportion of rock
     perc = percolate_onedrop(matrix=matrix1)
     animate_matrix(matrix=perc, size=800)  # size is number of pixels to draw the grid
