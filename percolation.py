@@ -1,4 +1,5 @@
 import datetime
+import multiprocessing
 import time
 
 import numpy as np
@@ -53,36 +54,29 @@ def percolate(matrix: np.ndarray):
     Returns: Numpy ndarray of 0 (rock), 1 (water) and 2 (sand)
     """
     N = matrix.shape[0]
-    new_matrix = np.zeros(shape=(N, N + 2), dtype=int)
-    blank = np.zeros(shape=(N, N + 2), dtype=int)
-
-    # this creates 'walls' on either side of the matrix, to prevent wrapping around
-    for i in range(N):
-        new_matrix[i, 0] = 2
-        new_matrix[i, N + 1] = 2
-
-    # This copies the matrix into the one with walls
-    for i in range(N):
-        for j in range(N):
-            new_matrix[i, j + 1] = matrix[i, j]
-    print(new_matrix)
-    matrix = new_matrix
 
     # This gets the first row, from the matrix. The starting blocks of the water
     for i in range(N):
-        if matrix[0, i + 1] == 2:
-            blank[0, i + 1] = 1
+        if matrix[0, i] == 2:
+            matrix[0, i] = 1
 
-    # This is the percolation algorithm. It loops through 'blank' matrix and adds in 1 if water can flow
-    for i in range(N):
+# This is the percolation algorithm. It loops through 'blank' matrix and adds in 1 if water can flow
+    for i in range(1, N):
         for j in range(N):
-            if matrix[i, j + 1] == 2:
-                if blank[i - 1, j + 2] == 1 or blank[i - 1, j + 1] == 1 \
-                        or blank[i - 1, j] == 1 or blank[i, j] == 1 or i == 0:
-                    blank[i, j + 1] = 1
+            if matrix[i, j] == 2:
+                if j == 0:
+                    if matrix[i - 1, j + 1] == 1 or matrix[i - 1, j] == 1 \
+                             or matrix[i, j + 1] == 1:
+                        matrix[i, j] = 1
+                elif j == N-1:
+                    if matrix[i - 1, j] == 1 \
+                            or matrix[i - 1, j - 1] == 1:
+                        matrix[i, j] = 1
                 else:
-                    blank[i, j + 1] = 2
-    return blank
+                    if matrix[i - 1, j + 1] == 1 or matrix[i - 1, j] == 1 \
+                            or matrix[i - 1, j-1] == 1 or matrix[i, j+1] == 1:
+                        matrix[i, j] = 1
+    return matrix
 
 
 def percolate_onedrop(matrix: np.ndarray):
@@ -96,43 +90,53 @@ def percolate_onedrop(matrix: np.ndarray):
     """
     N = matrix.shape[0]
 
-    # This adds in walls of rock on either side, to stop the drop of water flowing out of the grid
-    walled_matrix = np.zeros(shape=(N, N+2), dtype=int)
-    for i in range(N):
-        for j in range(N):
-            walled_matrix[i, j+1] = matrix[i, j]
-    matrix = walled_matrix
-
-    waterdrop_h = int(N / 2)
-    waterdrop_v = 0
+    waterdrop_h = int(N / 2)  # H for horizontal position
+    waterdrop_v = 0  # V for vertical position
     matrix[waterdrop_v, waterdrop_h] = 1
     possible_to_flow = True
-    while (possible_to_flow):
+    while possible_to_flow:
         if N == waterdrop_v + 2:  # checks if the water has reached the bottom
             possible_to_flow = False
-        if matrix[waterdrop_v + 1, waterdrop_h] == 2:  # checks the position directly below the drop
-            waterdrop_v += 1
-            matrix[waterdrop_v, waterdrop_h] = 1
-        elif matrix[waterdrop_v + 1, waterdrop_h - 1] == 2:  # checks the position down-left of drop
-            waterdrop_v += 1
-            waterdrop_h -= 1
-            matrix[waterdrop_v, waterdrop_h] = 1
-        elif matrix[waterdrop_v + 1, waterdrop_h + 1] == 2:  # checks the down-right position
-            waterdrop_v += 1
-            waterdrop_h += 1
-            matrix[waterdrop_v, waterdrop_h] = 1
-        elif matrix[waterdrop_v, waterdrop_h + 1] == 2:  # checks the position directly right
-            waterdrop_h += 1
-            matrix[waterdrop_v, waterdrop_h] = 1
-        else:
-            possible_to_flow = False  # if none of the options are sand, then end the loop
-
-    # This removes the walls on either side
-    walled_matrix = np.zeros(shape=(N, N), dtype=int)
-    for i in range(N):
-        for j in range(N):
-            walled_matrix[i, j] = matrix[i, j+1]
-    matrix=walled_matrix
+        if N-1 > waterdrop_h > 0:  # This incidates the drop isn't on either side of the matrix
+            if matrix[waterdrop_v + 1, waterdrop_h] == 2:  # checks the position directly below
+                waterdrop_v += 1
+                matrix[waterdrop_v, waterdrop_h] = 1
+            elif matrix[waterdrop_v + 1, waterdrop_h - 1] == 2:  # checks the position down-left
+                waterdrop_v += 1
+                waterdrop_h -= 1
+                matrix[waterdrop_v, waterdrop_h] = 1
+            elif matrix[waterdrop_v + 1, waterdrop_h + 1] == 2:  # checks the down-right position
+                waterdrop_v += 1
+                waterdrop_h += 1
+                matrix[waterdrop_v, waterdrop_h] = 1
+            elif matrix[waterdrop_v, waterdrop_h + 1] == 2:  # checks the position directly right
+                waterdrop_h += 1
+                matrix[waterdrop_v, waterdrop_h] = 1
+            else:
+                possible_to_flow = False  # if none of the options are sand, then end the loop
+        elif waterdrop_h == 0:  # handles the drop if it is on the left side of the matrix
+            if matrix[waterdrop_v + 1, waterdrop_h] == 2:  # checks the position directly below
+                waterdrop_v += 1
+                matrix[waterdrop_v, waterdrop_h] = 1
+            elif matrix[waterdrop_v + 1, waterdrop_h + 1] == 2:  # checks the down-right position
+                waterdrop_v += 1
+                waterdrop_h += 1
+                matrix[waterdrop_v, waterdrop_h] = 1
+            elif matrix[waterdrop_v, waterdrop_h + 1] == 2:  # checks the position directly right
+                waterdrop_h += 1
+                matrix[waterdrop_v, waterdrop_h] = 1
+            else:
+                possible_to_flow = False  # if none of the options are sand, then end the loop
+        elif waterdrop_h == N-1:  # Handles the drop if its on the right hand side of the matrix
+            if matrix[waterdrop_v + 1, waterdrop_h] == 2:  # checks the position directly below
+                waterdrop_v += 1
+                matrix[waterdrop_v, waterdrop_h] = 1
+            elif matrix[waterdrop_v + 1, waterdrop_h - 1] == 2:  # checks the position down-left
+                waterdrop_v += 1
+                waterdrop_h -= 1
+                matrix[waterdrop_v, waterdrop_h] = 1
+            else:
+                possible_to_flow = False  # if none of the options are sand, then end the loop
 
     return matrix
 
@@ -163,80 +167,124 @@ def run_sim(size: int, p: float, iterations: int):
     number_of_times_bottom_reached = 0
     for i in range(iterations):
         matrix = generate_matrix(size, p)
-        percolation = percolate_onedrop(matrix)
+        percolation = percolate(matrix)
         if test_percolation(percolation):
             number_of_times_bottom_reached += 1
 
     # This prints for each value of p if you run sim_vary_p. Comment out to avoid if necessary
-    print("\n\nMatrix size:", size, "x", size, "with p =", p)
-    print("In", iterations, "iterations, there were ", number_of_times_bottom_reached, "successes")
-    print("This is an average rate of", number_of_times_bottom_reached / iterations)
+    # print("\n\nMatrix size:", size, "x", size, "with p =", p)
+    # print("In", iterations, "iterations, there were ", number_of_times_bottom_reached, "successes")
+    # print("This is an average rate of", number_of_times_bottom_reached / iterations)
     return number_of_times_bottom_reached / iterations
 
 
-def sim_vary_p(size: int, iterations: int, steps: float) -> None:
+def sim_vary_p(size: int, iterations: int, steps: float, graph: bool = True) -> float:
     """
     Run a simulation across different values of P, and graph the results with matplotlib
     Args:
+        graph: whether or not it should draw a graph of p
         size: size of the square matrix (N in NxN)
         iterations: number of realisations for each value of p
         steps: the increase of p after each sim. (smaller values give more accurate graph results)
 
-    Returns: nothing. just outputs a graph with matplotlib
+    Returns: critical value of p (where in less than half of the matrices the water reaches bottom)
 
     """
-    print("Simulation started at", datetime.datetime.now())
+    # print("Simulation started at", datetime.datetime.now())
     x_values = np.arange(0, 1, steps)
-    y_values = []
-    hit_zero = False
-    for p in x_values:
-        if not hit_zero:
-            y_values.append(run_sim(size, p, iterations))
-        else:
-            y_values.append(0)
-        if y_values[-1] == 0:  # once zero is reached, it will stop simulating and only append zeros
-            hit_zero = True  # this will save useless computation
-    print("Simulation finished at", datetime.datetime.now())
-    print(x_values)
-    print(y_values)
-    plt.plot(x_values, y_values, color="k")
+    y_values = multiprocessing.Pool().map(simple_simulation, x_values)
+    # hit_zero = False
+    # for p in x_values:
+    #     if not hit_zero:
+    #         y_values.append(run_sim(size, p, iterations))
+    #     else:
+    #         y_values.append(0)
+    #     if y_values[-1] == 0:  # once zero is reached, it will stop simulating and only append zeros
+    #         hit_zero = True  # this will save useless computation
+    # print("Simulation finished at", datetime.datetime.now())
+    # print(x_values)
+    # print(y_values)
 
     # This finds the critical value of P. It could be improved by interpolating the data
     closest = 1
     Pc, Py = 0, 0
     for y in range(len(y_values)):
-        if abs(0.5-y_values[y]) < closest:
-            closest = abs(0.5-y_values[y])
-            Pc = x_values[y]
+        if abs(0.5 - y_values[y]) < closest:
+            closest = abs(0.5 - y_values[y])
+            Pc = round(x_values[y], 5)
             Py = y_values[y]
-    plt.plot([Pc, Pc], [1, 0], label="Critical value of P", color="r")
-    plt.plot([0, 1], [Py, Py], color="r")
-    plt.plot([Pc], [Py], "o", color="orange")
-    plt.text(Pc-0.1, 1, "Critical value of P="+str(Pc))
-    plt.text(0.75, Py+0.005, "" + str(round(Py*100)) + "% success rate")
-    plt.ylabel("Average probability of water reaching the bottom")
-    plt.xlabel("p")
-    plt.title("Percolation simulation: N=" + str(size) + ", nrep=" + str(iterations) + ", P steps=" + str(steps))
+    print(size, 'x', size, 'simulation completed at', datetime.datetime.now(), "- Pc=", Pc, "Py=", Py)
+    if graph:
+        plt.plot(x_values, y_values, color="k")
+        plt.plot([Pc, Pc], [1, 0], label="Critical value of P", color="r")
+        plt.plot([0, 1], [Py, Py], color="r")
+        plt.plot([Pc], [Py], "o", color="orange")
+        plt.text(Pc - 0.1, 1, "Critical value of P=" + str(Pc))
+        plt.text(0.75, Py + 0.005, "" + str(round(Py * 100)) + "% success rate")
+        plt.ylabel("Average probability of water reaching the bottom")
+        plt.xlabel("p")
+        plt.title(
+            "Percolation simulation: N=" + str(size) + ", nrep=" + str(iterations) + ", P steps=" + str(
+                steps))
 
+        plt.show()
+    return Pc
+
+
+def graph_critical_value_of_p():
+    labels = ['N=10', 'N=50', 'N=100', 'N=200', 'N=400']
+    y_ax = np.arange(len(labels))
+    values = [0.46, 0.3, 0.25, 0.21, 0.175]
+    plt.bar(y_ax, values, align='center', alpha=0.5)
+    plt.xticks(y_ax, labels)
+    plt.ylabel("Critical value of P")
+    plt.xlabel("Size of matrix (N)")
+    plt.title("Pc for different size matrices")
     plt.show()
 
 
+def simple_N(n):
+    nreps = 1000
+    steps = 0.0025
+    return sim_vary_p(n, nreps, steps, False)
+
+
+def simple_simulation(p):
+    N = 400
+    nreps = 1000
+    return run_sim(N, p, nreps)
+
+
+def sim_multi(nlist):
+    x_values = nlist
+    y_values = multiprocessing.Pool().map(simple_N, x_values)
+    print(x_values)
+    print(y_values)
+    plt.plot(x_values, y_values, color="k")
+    plt.ylabel("Critical value of P")
+    plt.xlabel("Size of matrix (N)")
+    plt.title("Critical value of P for different size matrices")
+    plt.show()
+
 if __name__ == "__main__":
-
+    print("simulation started")
     start_time = time.perf_counter()
+    lsit = np.arange(10, 400, 10)
+    #sim_multi(lsit)
+    # graph_critical_value_of_p()
     # To run many simulations and graph the results, use this function:
-    sim_vary_p(size=10, iterations=4000, steps=0.005)
-    sim_vary_p(size=50, iterations=4000, steps=0.005)
-    sim_vary_p(size=100, iterations=4000, steps=0.005)
-    sim_vary_p(size=200, iterations=4000, steps=0.005)
-    sim_vary_p(size=400, iterations=4000, steps=0.005)
-
+    # sim_vary_p(size=10, iterations=100000, steps=0.005)
+    # sim_vary_p(size=50, iterations=100000, steps=0.005)
+    sim_vary_p(size=400, iterations=1_000, steps=0.01)
+    # sim_vary_p(size=200, iterations=100000, steps=0.005)
+    # sim_vary_p(size=400, iterations=100000, steps=0.005)
     # This just times how long the simulation took (can easily be north of 1 hour)
     finish_time = time.perf_counter()
     time_taken = finish_time - start_time
     print("Time taken:", time_taken, "seconds")
 
     # To simulate just one percolation and animate it with graphics, use this syntax
-    matrix1 = generate_matrix(N=10, p=0.25)  # N - size of matrix, p - proportion of rock
-    perc = percolate_onedrop(matrix=matrix1)
-    animate_matrix(matrix=perc, size=800)  # size is number of pixels to draw the grid
+    # matrix1 = generate_matrix(N=50, p=0.50)  # N - size of matrix, p - proportion of rock
+    # perc = percolate(matrix=matrix1)
+    # animate_matrix(matrix=perc, size=800)  # size is number of pixels to draw the grid
+    # Next step is to run simulations on N=1, N=2, N=3, N=4... N=1,000 and graph the Pc
