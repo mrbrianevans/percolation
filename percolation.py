@@ -1,6 +1,7 @@
 import datetime
 import multiprocessing
 import time
+from typing import List
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,14 +14,12 @@ canvas.pack()
 COLORS = ('#242424', '#2eabd9', '#c28234')  # 0=black(stone), 1=blue(water), 2=brown(sand)
 
 
-def animate_matrix(matrix: np.ndarray, size):
+def animate_matrix(matrix: np.ndarray, size: int = 800):
     """
-    This function animates a matrix into coloured blocks
+    This function animates a matrix into coloured blocks.
     Args:
         matrix: A numpy ndarray object
         size: in pixels of how large the whole grid should animate to
-
-    Returns: none
 
     """
     m = matrix.shape[0]
@@ -33,7 +32,8 @@ def animate_matrix(matrix: np.ndarray, size):
             canvas.create_rectangle(100 + (gap) * j, 100 + (gap) * i, 100 + box + (gap) * j,
                                     100 + box + (gap) * i, fill=color)
     tk.update()
-    tk.mainloop()
+    time.sleep(0.5)  # adds a delay after drawing the matrix, this is useful for multiple animations
+
 
 
 def generate_matrix(N, p):
@@ -60,21 +60,21 @@ def percolate(matrix: np.ndarray):
         if matrix[0, i] == 2:
             matrix[0, i] = 1
 
-# This is the percolation algorithm. It loops through 'blank' matrix and adds in 1 if water can flow
+    # This is the percolation algorithm. It loops through 'blank' matrix and adds in 1 if water can flow
     for i in range(1, N):
         for j in range(N):
             if matrix[i, j] == 2:
                 if j == 0:
                     if matrix[i - 1, j + 1] == 1 or matrix[i - 1, j] == 1 \
-                             or matrix[i, j + 1] == 1:
+                            or matrix[i, j + 1] == 1:
                         matrix[i, j] = 1
-                elif j == N-1:
+                elif j == N - 1:
                     if matrix[i - 1, j] == 1 \
                             or matrix[i - 1, j - 1] == 1:
                         matrix[i, j] = 1
                 else:
                     if matrix[i - 1, j + 1] == 1 or matrix[i - 1, j] == 1 \
-                            or matrix[i - 1, j-1] == 1 or matrix[i, j+1] == 1:
+                            or matrix[i - 1, j - 1] == 1 or matrix[i, j + 1] == 1:
                         matrix[i, j] = 1
     return matrix
 
@@ -97,7 +97,7 @@ def percolate_onedrop(matrix: np.ndarray):
     while possible_to_flow:
         if N == waterdrop_v + 2:  # checks if the water has reached the bottom
             possible_to_flow = False
-        if N-1 > waterdrop_h > 0:  # This incidates the drop isn't on either side of the matrix
+        if N - 1 > waterdrop_h > 0:  # This incidates the drop isn't on either side of the matrix
             if matrix[waterdrop_v + 1, waterdrop_h] == 2:  # checks the position directly below
                 waterdrop_v += 1
                 matrix[waterdrop_v, waterdrop_h] = 1
@@ -127,7 +127,7 @@ def percolate_onedrop(matrix: np.ndarray):
                 matrix[waterdrop_v, waterdrop_h] = 1
             else:
                 possible_to_flow = False  # if none of the options are sand, then end the loop
-        elif waterdrop_h == N-1:  # Handles the drop if its on the right hand side of the matrix
+        elif waterdrop_h == N - 1:  # Handles the drop if its on the right hand side of the matrix
             if matrix[waterdrop_v + 1, waterdrop_h] == 2:  # checks the position directly below
                 waterdrop_v += 1
                 matrix[waterdrop_v, waterdrop_h] = 1
@@ -153,10 +153,13 @@ def test_percolation(matrix: np.ndarray) -> bool:
 # NEXT STEP: write simulation tests for a thousand cases
 
 
-def run_sim(size: int, p: float, iterations: int):
+def run_sim(size: int, p: float, iterations: int, algorithm=percolate_onedrop,
+            print_output: bool = False):
     """
     Simulates the percolation algorithm on randomly generated matrices and returns average successes
     Args:
+        algorithm: which percolation algorithm to use in the simulation (percolate_onedrop by default)
+        print_output: whether or not to print the number of percolations
         size: size of the square matrix (N in NxN)
         p: probability of rocks being generated for each cell of the matrix
         iterations: number of realisations
@@ -167,21 +170,25 @@ def run_sim(size: int, p: float, iterations: int):
     number_of_times_bottom_reached = 0
     for i in range(iterations):
         matrix = generate_matrix(size, p)
-        percolation = percolate(matrix)
+        percolation = algorithm(matrix)
         if test_percolation(percolation):
             number_of_times_bottom_reached += 1
 
-    # This prints for each value of p if you run sim_vary_p. Comment out to avoid if necessary
-    # print("\n\nMatrix size:", size, "x", size, "with p =", p)
-    # print("In", iterations, "iterations, there were ", number_of_times_bottom_reached, "successes")
-    # print("This is an average rate of", number_of_times_bottom_reached / iterations)
+    # This prints for each value of p if you run sim_vary_p
+    if print_output:
+        print("\n\nMatrix size:", size, "x", size, "with p =", p)
+        print("In", iterations, "iterations, there were ", number_of_times_bottom_reached,
+              "successes")
+        print("This is an average rate of", number_of_times_bottom_reached / iterations)
     return number_of_times_bottom_reached / iterations
 
 
-def sim_vary_p(size: int, iterations: int, steps: float, graph: bool = True) -> float:
+def sim_vary_p(size: int, iterations: int, steps: float, graph: bool = True,
+               multi: bool = True) -> float:
     """
     Run a simulation across different values of P, and graph the results with matplotlib
     Args:
+        multi: whether or not to use multithreading to speed up performance-dont use with sim_vary_N
         graph: whether or not it should draw a graph of p
         size: size of the square matrix (N in NxN)
         iterations: number of realisations for each value of p
@@ -191,20 +198,14 @@ def sim_vary_p(size: int, iterations: int, steps: float, graph: bool = True) -> 
 
     """
     # print("Simulation started at", datetime.datetime.now())
-    x_values = np.arange(0, 1, steps)
-    y_values = multiprocessing.Pool().map(simple_simulation, x_values)
-    # hit_zero = False
-    # for p in x_values:
-    #     if not hit_zero:
-    #         y_values.append(run_sim(size, p, iterations))
-    #     else:
-    #         y_values.append(0)
-    #     if y_values[-1] == 0:  # once zero is reached, it will stop simulating and only append zeros
-    #         hit_zero = True  # this will save useless computation
-    # print("Simulation finished at", datetime.datetime.now())
-    # print(x_values)
-    # print(y_values)
 
+    # This is the main computation. It uses multiprocessing to spread the computation across threads
+    x_values = np.arange(0, 1, steps)
+    args = [(size, x, iterations) for x in x_values]
+    if multi:  # This uses multiprocessing
+        y_values = multiprocessing.Pool().starmap(run_sim, args)
+    else:  # This does it the conventional way
+        y_values = [run_sim(size, p, iterations) for p in x_values]
     # This finds the critical value of P. It could be improved by interpolating the data
     closest = 1
     Pc, Py = 0, 0
@@ -213,7 +214,10 @@ def sim_vary_p(size: int, iterations: int, steps: float, graph: bool = True) -> 
             closest = abs(0.5 - y_values[y])
             Pc = round(x_values[y], 5)
             Py = y_values[y]
-    print(size, 'x', size, 'simulation completed at', datetime.datetime.now(), "- Pc=", Pc, "Py=", Py)
+    print(size, 'x', size, 'simulation completed at', datetime.datetime.now(), "- Pc=", Pc, "Py=",
+          Py)
+
+    # This is just the plotting of the graph using matplotlib, if the graph variable is true
     if graph:
         plt.plot(x_values, y_values, color="k")
         plt.plot([Pc, Pc], [1, 0], label="Critical value of P", color="r")
@@ -224,67 +228,85 @@ def sim_vary_p(size: int, iterations: int, steps: float, graph: bool = True) -> 
         plt.ylabel("Average probability of water reaching the bottom")
         plt.xlabel("p")
         plt.title(
-            "Percolation simulation: N=" + str(size) + ", nrep=" + str(iterations) + ", P steps=" + str(
+            "Percolation simulation: N=" + str(size) + ", nrep=" + str(
+                iterations) + ", P steps=" + str(
                 steps))
 
         plt.show()
     return Pc
 
 
-def graph_critical_value_of_p():
-    labels = ['N=10', 'N=50', 'N=100', 'N=200', 'N=400']
-    y_ax = np.arange(len(labels))
-    values = [0.46, 0.3, 0.25, 0.21, 0.175]
-    plt.bar(y_ax, values, align='center', alpha=0.5)
-    plt.xticks(y_ax, labels)
-    plt.ylabel("Critical value of P")
-    plt.xlabel("Size of matrix (N)")
-    plt.title("Pc for different size matrices")
-    plt.show()
+def sim_vary_N(nlist: List[int], nreps: int, steps: float, graph: bool = False):
+    """
+    This function is to show the relationship between the size of a matrix, N, and its percolation
+    constant, Pc. It will draw a graph of Pc for the N values provided in nlist.
+    Args:
+        nlist: a list of integers, the sizes of matrix to run the algorithm on. eg. [5, 10, 50]
+        nreps: number of iterations for each matrix size, for each value of p. High = more accurate.
+        I recommend about 10,000 for an accurate graph (smoother).
+        steps: the increase of p each run. The interval of p. eg p=0.01 -> p~ [0.01, 0.02, 0.03 ...]
+        graph: whether or not to draw individual graphs for each matrix size N simulated.
 
-
-def simple_N(n):
-    nreps = 1000
-    steps = 0.0025
-    return sim_vary_p(n, nreps, steps, False)
-
-
-def simple_simulation(p):
-    N = 400
-    nreps = 1000
-    return run_sim(N, p, nreps)
-
-
-def sim_multi(nlist):
+    """
     x_values = nlist
-    y_values = multiprocessing.Pool().map(simple_N, x_values)
+    args = [(n, nreps, steps, graph, False) for n in nlist]
+    y_values = multiprocessing.Pool().starmap(sim_vary_p, args)
+
     print(x_values)
     print(y_values)
+
+    # This is just plotting the results
     plt.plot(x_values, y_values, color="k")
     plt.ylabel("Critical value of P")
     plt.xlabel("Size of matrix (N)")
     plt.title("Critical value of P for different size matrices")
     plt.show()
 
+
 if __name__ == "__main__":
-    print("simulation started")
+    # Examples of how to use functions:
+
+    # Generate Matrix
+    random_matrix = generate_matrix(35, 0.5)  # This generates a 35x35 matrix, half sand, half stone
+
+    # Animate Matrix
+    animate_matrix(random_matrix, 800)  # This draw the matrix, random_matrix, 800 pixels square
+
+    # Percolate Onedrop - This will simulate just one drop of water, starting in the top middle
+    percolate_onedrop(random_matrix)  # flowing down the matrix through the sand
+    animate_matrix(random_matrix)  # To visualise the results of the onedrop percolation
+
+    # Percolate
+    percolate(random_matrix)  # This will simulate unlimited water flowing down the matrix
+    animate_matrix(random_matrix)  # To visualise the results of the percolation
+
+    # Test percolation
+    outcome = test_percolation(random_matrix)  # This tests if the water reached the bottom
+    print("Did the water reach the bottom?", outcome)  # Returns a boolean (True/False)
+
+    # Run Simulation - uses percolate_onedrop by default
+    success_rate = run_sim(50, 0.3, 1_000, percolate, True)
+    # This will return the proportion of randomly generated matrices, where water reached the bottom
+
+    # Simulate a variety of p values
+    critical_percolation_constant = sim_vary_p(50, 1_000, 0.01, True)  # This will output a graph
+    # This calculates the critical value of p for a matrix of size N
+
+    # Simulate a variety of N values
+    matrix_sizes = [size for size in range(2, 50)]
+    sim_vary_N(matrix_sizes, 1_000, 0.01, False)
+    # This outputs a graph of the critical p value for different sizes of matrices
+
+    # Some of these calculations can take a while, especially on big numbers of iterations
+    # To time how long a simulation takes, you can use perf_counter() as shown:
+
+    print("Simulation started at {}".format(datetime.datetime.now()))
     start_time = time.perf_counter()
-    lsit = np.arange(10, 400, 10)
-    #sim_multi(lsit)
-    # graph_critical_value_of_p()
-    # To run many simulations and graph the results, use this function:
-    # sim_vary_p(size=10, iterations=100000, steps=0.005)
-    # sim_vary_p(size=50, iterations=100000, steps=0.005)
-    sim_vary_p(size=400, iterations=1_000, steps=0.01)
-    # sim_vary_p(size=200, iterations=100000, steps=0.005)
-    # sim_vary_p(size=400, iterations=100000, steps=0.005)
-    # This just times how long the simulation took (can easily be north of 1 hour)
+
+    # Function goes here
+
     finish_time = time.perf_counter()
     time_taken = finish_time - start_time
-    print("Time taken:", time_taken, "seconds")
+    print("Time taken: {} seconds".format(time_taken))
 
-    # To simulate just one percolation and animate it with graphics, use this syntax
-    # matrix1 = generate_matrix(N=50, p=0.50)  # N - size of matrix, p - proportion of rock
-    # perc = percolate(matrix=matrix1)
-    # animate_matrix(matrix=perc, size=800)  # size is number of pixels to draw the grid
-    # Next step is to run simulations on N=1, N=2, N=3, N=4... N=1,000 and graph the Pc
+    tk.mainloop()
