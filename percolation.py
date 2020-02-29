@@ -39,6 +39,44 @@ def animate_matrix(matrix: np.ndarray, size: int = 800, delay: float = 0):
     time.sleep(0.3)  # adds a delay after drawing the matrix, this is useful for multiple animations
 
 
+def animate_diagonal_matrix(matrix: np.ndarray, size: int = 800, delay: float = 0):
+    """
+    This function animates a matrix specifically for the diagonal percolation algorithm.
+    Args:
+        delay: total time to draw the matrix in seconds. Use for after percolation has occured.
+        matrix: A numpy ndarray object
+        size: in pixels of how large the whole grid should animate to
+
+    """
+    canvas.delete("all") if not delay else ""
+    m = matrix.shape[0]
+    n = matrix.shape[1]
+    box = size / max(m, n)
+    gap = 2 + box if max(m, n) < 25 else box
+
+    for row in range(n):
+        for column in range(row + 1):
+            i = column
+            j = row - column
+            color = COLORS[matrix[i, j]]
+            canvas.create_rectangle(100 + gap * j, 100 + gap * i, 100 + box + gap * j,
+                                    100 + box + gap * i, fill=color)
+        tk.update()
+        time.sleep(delay/n)
+    for row in range(n):
+        for column in range(n - row - 1):
+            i = n - column - 1
+            j = row + column + 1
+            color = COLORS[matrix[i, j]]
+            canvas.create_rectangle(100 + gap * j, 100 + gap * i, 100 + box + gap * j,
+                                    100 + box + gap * i, fill=color)
+        tk.update()
+        time.sleep(delay/n)
+
+    tk.update()
+    time.sleep(0.3)  # adds a delay after drawing the matrix, this is useful for multiple animations
+
+
 def generate_matrix(N, p):
     """
     Generates a random binary matrix to use as the base for percolation
@@ -63,7 +101,7 @@ def percolate(matrix: np.ndarray):
         if matrix[0, i] == 2:
             matrix[0, i] = 1
 
-# This is the percolation algorithm. It loops through 'blank' matrix and adds in 1 if water can flow
+    # This is the percolation algorithm. It loops through 'blank' matrix and adds in 1 if water can flow
     for i in range(1, N):
         for j in range(N):
             if matrix[i, j] == 2:
@@ -317,7 +355,7 @@ if __name__ == "__main__":
     random_matrix = generate_matrix(50, 0.4)  # This generates a 50x50 matrix, where p = 0.4
     animate_matrix(random_matrix)  # To visualise the new randomly generated matrix
     percolate_diagonally(random_matrix)  # This will simulate unlimited water starting in the corner
-    animate_matrix(random_matrix, delay=3)  # To visualise the results of the directed percolation
+    animate_diagonal_matrix(random_matrix, delay=5)  # NOTE: This is a different animate function
 
     # Test percolation
     outcome = test_percolation(random_matrix)  # This tests if the water reached the bottom
@@ -349,5 +387,3 @@ if __name__ == "__main__":
     print("Time taken: {} seconds".format(time_taken))
 
     tk.mainloop()
-
-
