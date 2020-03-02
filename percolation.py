@@ -1,4 +1,5 @@
 import datetime
+import gc
 import multiprocessing
 import time
 from typing import List
@@ -62,7 +63,7 @@ def animate_diagonal_matrix(matrix: np.ndarray, size: int = 800, delay: float = 
             canvas.create_rectangle(100 + gap * j, 100 + gap * i, 100 + box + gap * j,
                                     100 + box + gap * i, fill=color)
         tk.update()
-        time.sleep(delay/n)
+        time.sleep(delay / n)
     for row in range(n):
         for column in range(n - row - 1):
             i = n - column - 1
@@ -71,7 +72,7 @@ def animate_diagonal_matrix(matrix: np.ndarray, size: int = 800, delay: float = 
             canvas.create_rectangle(100 + gap * j, 100 + gap * i, 100 + box + gap * j,
                                     100 + box + gap * i, fill=color)
         tk.update()
-        time.sleep(delay/n)
+        time.sleep(delay / n)
 
     tk.update()
     time.sleep(0.3)  # adds a delay after drawing the matrix, this is useful for multiple animations
@@ -236,10 +237,25 @@ def run_sim(size: int, p: float, iterations: int, algorithm=percolate_onedrop,
 
     """
     number_of_times_bottom_reached = 0
+    # # This method uses multiprocessing - causes memory errors unless you have loads of RAM
+    # args = [(size, p, algorithm)]*iterations
+    # matrices = []
+    # for i in range(iterations):
+    #     matrices.append(generate_matrix(size, p))
+    # print("random matrices generated, sleeping 5 seconds")
+    # time.sleep(5)
+    # args = [(m, algorithm) for m in matrices]
+    # successes = multiprocessing.Pool().starmap(single_sim, args)
+    # number_of_times_bottom_reached = sum(successes)
+    # print("Processing done - waiting another 5 seconds of summer")
+    # time.sleep(5)
+
+    # This way does it without multiprocessing
+    test_algorithm = test_diagonal_percolation if algorithm.__name__ == 'percolate_diagonally' else test_percolation
     for i in range(iterations):
         matrix = generate_matrix(size, p)
-        percolation = algorithm(matrix)
-        if test_percolation(percolation):
+        algorithm(matrix)
+        if test_algorithm(matrix):
             number_of_times_bottom_reached += 1
 
     # This prints for each value of p if you run sim_vary_p
@@ -251,11 +267,71 @@ def run_sim(size: int, p: float, iterations: int, algorithm=percolate_onedrop,
     return number_of_times_bottom_reached / iterations
 
 
-def sim_vary_p(size: int, iterations: int, steps: float, algorithm=percolate_onedrop,
-               graph: bool = True,
+def find_critical_p(size, iterations, accuracy, algorithm, graph=True):
+    """
+    This uses binary search to find the critical value of p for given properties
+    Args:
+        size: size of matrix, N ie nxn
+        iterations: number of realisations per p value. Higher is more accurate
+        accuracy: the acceptable deviation from the actual critical value (usually 0.01)
+        algorithm: the percolation algorithm to find the critical value of
+        graph: whether or not to graph the outputs. (don't use when running sim_vary_N)
+
+    Returns: the critical value of p
+
+    """
+    x_values = []
+    y_values = []
+    min_accept = 0.5 - accuracy
+    max_accept = 0.5 + accuracy
+    step = 0.5
+    start = 0
+    stop = 1.1
+    for k in range(100_000_000):  # This is more than enough for most sims, but wont let it run away
+        for i in np.arange(start, stop, step):
+            pc = run_sim(size, i, iterations, algorithm)
+            x_values.append(i)
+            y_values.append(pc)
+            # print("{}% success rate when p={}".format(round(pc*100), i))
+            if min_accept < pc < max_accept:
+                if graph:
+                    plt.plot(x_values, y_values, "o", color="k", markersize=4)
+                    plt.plot([i, i], [1, 0], label="Critical value of P", color="r")
+                    plt.plot([0, 1], [pc, pc], color="r")
+                    plt.plot([i], [i], "o", color="orange")
+                    plt.text(i - 0.1, 1, "Critical value of P=" + str(i))
+                    plt.text(0.75, pc + 0.005, "" + str(round(pc * 100)) + "% success rate")
+                    plt.ylabel("Average probability of water reaching the bottom")
+                    plt.xlabel("p")
+                    plt.title(
+                        "{} simulation: N={} nrep={}, accuracy={}".format(algorithm.__name__, size,
+                                                                          iterations, accuracy))
+                    plt.ylim(0, 1)
+                    plt.show()
+                print(x_values)
+                print(y_values)
+                print(size, 'x', size, 'simulation completed at', datetime.datetime.now(),
+                      "- when p=",
+                      i, "success rate=", pc, "algorithm =", algorithm.__name__)
+                return i
+            elif pc < 0.5:
+
+                stop = round(i, 5)
+                start = round(stop - step, 5)
+                step /= 3
+                stop += step
+                print("P is in the range of {} to {}".format(start, stop))
+                # print("Now stepping through range({}, {}, {})".format(start, stop, step))
+                break
+    print("Either you are asking for unreasonable accuracy, or something has gone wrong in the app")
+
+
+def sim_vary_p(size, iterations, steps, algorithm=percolate_onedrop, graph=True,
                multi: bool = True) -> float:
     """
     Run a simulation across different values of P, and graph the results with matplotlib
+    This is a less efficient way of finding the critical value of P.
+    It is recommended to use find_critical_p() unless you want a continuous graph.
     Args:
         algorithm: the percolation algorithm to use in the simulation (percolate_onedrop by default)
         multi: whether or not to use multithreading to speed up performance-dont use with sim_vary_N
@@ -270,13 +346,13 @@ def sim_vary_p(size: int, iterations: int, steps: float, algorithm=percolate_one
     # print("Simulation started at", datetime.datetime.now())
 
     # This is the main computation. It uses multiprocessing to spread the computation across threads
-    x_values = np.arange(0, 1, steps)
+    x_values = np.arange(0.38,0.45,steps) if algorithm.__name__ == 'percolate_diagonally' else np.arange(0.1,0.9,steps)
     args = [(size, x, iterations, algorithm) for x in x_values]
-    if multi:  # This uses multiprocessing
-        y_values = multiprocessing.Pool().starmap(run_sim, args)
-    else:  # This does it the conventional way
-        y_values = [run_sim(size, p, iterations, algorithm) for p in x_values]
+    y_values = multiprocessing.Pool().starmap(run_sim, args) if multi else [run_sim(*arg) for arg in args]
+
     # This finds the critical value of P. It could be improved by interpolating the data
+    print(x_values)
+    print(y_values)
     closest = 1
     Pc, Py = 0, 0
     for y in range(len(y_values)):
@@ -320,8 +396,8 @@ def sim_vary_N(nlist: List[int], nreps: int, steps: float, algorithm, graph: boo
 
     """
     x_values = nlist
-    args = [(n, nreps, steps, algorithm, graph, False) for n in nlist]
-    y_values = multiprocessing.Pool().starmap(sim_vary_p, args)
+    args = [(n, nreps, steps, algorithm) for n in nlist]
+    y_values = multiprocessing.Pool().starmap(find_critical_p, args)
 
     print(x_values)
     print(y_values)
@@ -358,16 +434,17 @@ if __name__ == "__main__":
     animate_diagonal_matrix(random_matrix, delay=5)  # NOTE: This is a different animate function
 
     # Test percolation
-    outcome = test_percolation(random_matrix)  # This tests if the water reached the bottom
+    outcome = test_diagonal_percolation(random_matrix)  # This tests if the water reached the bottom
     print("Did the water reach the bottom?", outcome)  # Returns a boolean (True/False)
 
     # Run Simulation - uses percolate_onedrop by default
-    success_rate = run_sim(50, 0.3, 1_000, percolate, True)
+    success_rate = run_sim(50, 0.3, 1_000, percolate_diagonally, True)
     # This will return the proportion of randomly generated matrices, where water reached the bottom
 
     # Simulate a variety of p values
-    critical_percolation_constant = sim_vary_p(50, 1_000, 0.01, graph=True)  # To output a graph
-    # This calculates the critical value of p for a matrix of size N
+    find_critical_p(50, 1_000, 0.01, algorithm=percolate, graph=True)
+    sim_vary_p(50, 1_000, 0.01, algorithm=percolate, graph=True)
+    # This calculates and returns the critical value of p for a matrix of size N
 
     # Simulate a variety of N values
     matrix_sizes = [size for size in range(2, 50)]
